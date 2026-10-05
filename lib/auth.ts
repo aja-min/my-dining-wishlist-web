@@ -6,7 +6,7 @@ import type { NextRequest } from 'next/server';
 import { AppError, type Author } from './model';
 import { allowedAccounts } from './allowed-accounts';
 export const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
-export function dataMode() { return process.env.DATA_MODE === 'google' ? 'google' : 'local'; }
+export function dataMode() { return process.env.DATA_MODE === 'google' || (!process.env.DATA_MODE && process.env.VERCEL) ? 'google' : 'local'; }
 export function displayName(email?: string | null): Author | null {
   return allowedAccounts(process.env.NAOTO_EMAIL, process.env.AZUSA_EMAIL).displayName(email);
 }
