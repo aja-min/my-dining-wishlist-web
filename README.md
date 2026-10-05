@@ -175,3 +175,7 @@ npm run test:browser  # インストール済みGoogle Chromeを使用
 ## Vercel運用
 
 本番環境には `DATA_MODE=google` とOAuth・Sheetsの環境変数を設定します。`NEXTAUTH_URL` は本番のHTTPS URL、`NEXTAUTH_SECRET` は本番専用のランダム値を使用します。Google OAuthクライアントの承認済みリダイレクトURIに、本番URLの `/api/auth/callback/google` を追加してください。秘密値はGitに含めず、Vercelの環境変数で管理します。
+
+本番URL: https://my-dining-wishlist-web.vercel.app
+
+GitHubの `aja-min/my-dining-wishlist-web` とVercelを連携しています。`main` へのpushで本番を自動デプロイします。Google OAuthの承認済みリダイレクトURIには `https://my-dining-wishlist-web.vercel.app/api/auth/callback/google` を登録してください。
