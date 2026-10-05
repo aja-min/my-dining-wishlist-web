@@ -1,0 +1,11 @@
+ID,書いた日にち,書いた人,Google mapのURL,行ったかどうか
+10000000-0000-4000-8000-000000000001,2026-10-04,なおと,https://www.google.com/maps/search/?api=1&query=%E5%96%AB%E8%8C%B6%20%E3%81%93%E3%82%82%E3%82%8C%E3%81%B3,FALSE
+10000000-0000-4000-8000-000000000002,2026-10-04,あずさ,https://www.google.com/maps/search/?api=1&query=%E6%89%8B%E6%89%93%E3%81%A1%E3%81%9D%E3%81%B0%20%E9%A2%A8%E9%9F%B3,FALSE
+10000000-0000-4000-8000-000000000003,2026-10-03,なおと,https://www.google.com/maps/search/?api=1&query=Bistro%2C%20%E6%9C%88%E3%81%A8%E6%9C%A8,FALSE
+10000000-0000-4000-8000-000000000004,2026-10-03,あずさ,https://www.google.com/maps/search/?api=1&query=%E3%83%91%E3%83%B3%E3%81%A8%E3%82%B9%E3%83%BC%E3%83%97%20%E7%81%AF,FALSE
+10000000-0000-4000-8000-000000000005,2026-10-02,なおと,https://www.google.com/maps/search/?api=1&query=%E8%8C%B6%E6%88%BF%20%E4%BD%99%E7%99%BD,FALSE
+10000000-0000-4000-8000-000000000006,2026-10-02,あずさ,https://www.google.com/maps/search/?api=1&query=%E6%B4%8B%E9%A3%9F%20%E3%83%9F%E3%82%BA%E3%82%A4%E3%83%AD,TRUE
+10000000-0000-4000-8000-000000000007,2026-10-01,なおと,https://www.google.com/maps/search/?api=1&query=%E3%83%94%E3%83%83%E3%83%84%E3%82%A7%E3%83%AA%E3%82%A2%20%E6%B5%B7%E8%BE%BA,FALSE
+10000000-0000-4000-8000-000000000008,2026-10-01,あずさ,https://www.google.com/maps/search/?api=1&query=%E3%81%94%E3%81%AF%E3%82%93%E5%B1%8B%20%E6%97%A5%E3%80%85,TRUE
+,,,,FALSE
+,,,,
