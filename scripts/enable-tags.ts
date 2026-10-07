@@ -1,9 +1,9 @@
 // Run after deploying the backwards-compatible reader. Adds only F1.
-import env from '@next/env';
+import { loadEnvConfig } from '@next/env';
 import { HEADERS, parseRows } from '../lib/model';
 import { sheetsAccessToken } from '../lib/service-account';
 async function main() {
-  env.loadEnvConfig(process.cwd());
+  loadEnvConfig(process.cwd());
   const id=process.env.GOOGLE_SPREADSHEET_ID;
   const tab=process.env.GOOGLE_SHEET_TAB;
   if(!id || !/^[a-zA-Z0-9_-]+$/.test(id) || !tab) throw new Error('Missing spreadsheet configuration');
@@ -27,4 +27,4 @@ async function main() {
   if(after.values?.[0]?.[5]!=='タグ')throw new Error('Tag header verification failed');
   console.log('Tag column enabled: wrote F1 only. Existing shop cells were not written.');
 }
-main().catch(()=>{console.error('Tag column setup failed; check the configured spreadsheet and column layout.');process.exitCode=1;});
+main().catch((error)=>{console.error('Tag column setup failed:', error instanceof Error ? error.message : 'Unknown error');process.exitCode=1;});
