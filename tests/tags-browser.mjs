@@ -11,7 +11,8 @@ await context.route('**/data/shops.csv',async route=>route.fulfill({contentType:
 await context.route('**/api/preview?*',route=>route.fulfill({status:503,body:'{}'}));
 const dialog=page.getByRole('dialog');
 const first=page.locator('article').first();
-const tags=page.getByLabel('タグで絞り込み');
+const tags=page.getByRole('group',{name:'タグで絞り込み'});
+async function selectTag(name){const button=tags.getByRole('button',{name,exact:true});if(!await button.isVisible())await tags.getByRole('button',{name:'タグをもっと表示'}).click();await button.click();}
 const saved=()=>page.evaluate(()=>JSON.parse(localStorage.getItem('ikitai-omise.demo.v1')));
 async function edit(){await first.getByRole('button',{name:/のタグを編集$/}).click();await expect(dialog).toBeVisible();}
 async function save(){await dialog.getByRole('button',{name:'保存する',exact:true}).click();await expect(dialog).not.toBeVisible();await expect(page.getByText('タグを保存しました。',{exact:true})).toBeVisible();}
@@ -21,13 +22,19 @@ try{
  await dialog.getByLabel('自由入力のタグ').fill('記念日');await dialog.getByLabel('自由入力のタグ').press('Enter');await expect(dialog).toBeVisible();
  await save();await expect(first.locator('.tag-badge')).toHaveText(['居酒屋','ランチ','記念日']);
  await page.reload();await expect(first.locator('.tag-badge')).toHaveText(['居酒屋','ランチ','記念日']);
- await tags.selectOption('tag:記念日');await expect(page.locator('article')).toHaveCount(1);
+ await expect(tags.locator('.tag-options button')).toHaveCount(4);
+ await selectTag('記念日');await expect(page.locator('article')).toHaveCount(1);
+ await tags.getByRole('button',{name:'ランチ',exact:true}).click();await expect(page.locator('article')).toHaveCount(1);
+ await tags.getByRole('button',{name:'デザート',exact:true}).click();await expect(page.locator('article')).toHaveCount(0);
+ await tags.getByRole('button',{name:'デザート',exact:true}).click();await tags.getByRole('button',{name:'ランチ',exact:true}).click();
+ await tags.getByRole('button',{name:'表示を減らす'}).click();await expect(tags.getByRole('button',{name:'記念日',exact:true})).toBeVisible();
+
  await edit();await dialog.getByRole('button',{name:'✓ 居酒屋',exact:true}).click();await dialog.getByRole('button',{name:'キャンセル',exact:true}).click();await expect(first.locator('.tag-badge')).toHaveText(['居酒屋','ランチ','記念日']);
  await edit();await dialog.getByRole('button',{name:'✓ 居酒屋',exact:true}).click();await dialog.getByRole('button',{name:'✓ ランチ',exact:true}).click();await dialog.getByRole('button',{name:'✓ 記念日',exact:true}).click();await save();await expect(page.locator('article')).toHaveCount(0);
- await tags.selectOption('');await expect(page.locator('article')).toHaveCount(6);
+ await tags.getByRole('button',{name:'タグ選択を解除'}).click();await expect(page.locator('article')).toHaveCount(6);
  await edit();await dialog.getByLabel('自由入力のタグ').fill('長'.repeat(33));await dialog.getByRole('button',{name:'保存する',exact:true}).click();await expect(dialog.getByRole('alert')).toContainText('32文字');await expect(dialog).toBeVisible();
  await dialog.getByLabel('自由入力のタグ').fill('パン,ケーキ');await save();await expect(first.locator('.tag-badge')).toHaveText(['パン,ケーキ']);
- await tags.selectOption('tag:パン,ケーキ');await expect(page.locator('article')).toHaveCount(1);
+ await selectTag('パン,ケーキ');await expect(page.locator('article')).toHaveCount(1);
  // A failed local write leaves the original saved tag and dialog intact.
  const before=await saved();await edit();await dialog.getByRole('button',{name:'デザート',exact:true}).click();
  await page.evaluate(()=>{window.originalSetItem=Storage.prototype.setItem;Storage.prototype.setItem=function(){throw new Error('quota');};});
@@ -35,7 +42,7 @@ try{
  await page.evaluate(()=>{Storage.prototype.setItem=window.originalSetItem;});await save();await expect(first.locator('.tag-badge')).toHaveText(['パン,ケーキ','デザート']);
  await page.getByRole('button',{name:'お店を追加',exact:true}).click();await dialog.getByLabel('Google MapsのURL',{exact:false}).fill('https://www.google.com/maps/place/Tag+Cafe');
  await dialog.getByRole('button',{name:'ビストロ',exact:true}).click();await dialog.getByLabel('自由入力のタグ').fill('新しいタグ');
- await dialog.getByRole('button',{name:'お店を登録',exact:true}).click();await expect(dialog).not.toBeVisible();await expect(tags).toHaveValue('');
+ await dialog.getByRole('button',{name:'お店を登録',exact:true}).click();await expect(dialog).not.toBeVisible();await expect(tags.locator('[aria-pressed=true]')).toHaveCount(0);
  const added=page.getByRole('article',{name:'Tag Cafe',exact:true});await expect(added.locator('.tag-badge')).toHaveText(['ビストロ','新しいタグ']);
  await page.reload();await expect(added.locator('.tag-badge')).toHaveText(['ビストロ','新しいタグ']);
  await added.getByRole('button',{name:/のタグを編集$/}).click();

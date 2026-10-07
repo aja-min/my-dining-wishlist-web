@@ -50,7 +50,13 @@ test('Sheets creation writes tags as stringValue, uses server author and retains
 });
 test('Tag filter combines with region, visit state, author and text, with untagged independent of a literal 未分類 tag',()=>{
  const shops=parseRows([[...HEADERS,'タグ'],[...row(),'["居酒屋","ランチ"]'],[...row(id2),'[]']]);
- const filter=(tag:string,author='全員',query='')=>filterShops(shops,query,author,'まだ','新しい順',true,{},'東京都','渋谷区',tag);
- assert.equal(filter('tag:ランチ').length,1);assert.equal(filter('tag:ランチ','あずさ').length,0);assert.equal(filter('tag:ランチ','なおと','居酒屋').length,1);
- assert.equal(filter('').length,2);assert.equal(filter('tag:未分類').length,0);
+ const filter=(tags:string[],author='全員',query='')=>filterShops(shops,query,author,'まだ','新しい順',true,{},'東京都','渋谷区',tags);
+ assert.equal(filter(['ランチ']).length,1);assert.equal(filter(['ランチ'],'あずさ').length,0);assert.equal(filter(['ランチ'],'なおと','居酒屋').length,1);
+ assert.equal(filter([]).length,2);assert.equal(filter(['未分類']).length,0);
+});
+
+test('Multiple selected tags use AND, and no selection includes untagged shops',()=>{
+ const shops=parseRows([[...HEADERS,'タグ'],[...row(),'["居酒屋"]'],[...row(id2),'["ランチ"]'],[...row('10000000-0000-4000-8000-000000000003'),'[]']]);
+ const filter=(tags:string[])=>filterShops(shops,'','全員','まだ','新しい順',true,{},'すべて','すべて',tags);
+ assert.equal(filter(['居酒屋','ランチ']).length,0);assert.equal(filter(['居酒屋','デザート']).length,0);shops[0].tags?.push('ランチ');assert.equal(filter(['居酒屋','ランチ']).length,1);assert.equal(filter([]).length,3);
 });
