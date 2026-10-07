@@ -34,7 +34,7 @@ export async function resolvePreview(input:string, fetchPage:FetchPage=safeMapFe
         if(!response.location || redirects===5)break;
         // Every destination is independently allowlisted before DNS or HTTP access.
         current=mapsUrl(new URL(response.location,current).href);
-        const next=urlPreview(current);if(next.source!=='fallback' || next.embedUrl)fallback=next;
+        const next=urlPreview(current);if(next.source!=='fallback' || next.embedUrl)fallback={...next,...(!next.address && fallback.address ? {address:fallback.address,prefecture:fallback.prefecture,municipality:fallback.municipality}: {})};
         continue;
       }
       if(response.status!==200)break;
