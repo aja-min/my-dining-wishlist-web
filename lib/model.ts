@@ -1,8 +1,9 @@
+import { normalizeTags, parseTagsCell } from './tags';
 import Papa from 'papaparse';
 export const HEADERS = ['ID', '書いた日にち', '書いた人', 'Google mapのURL', '行ったかどうか'] as const;
 export type Author = 'なおと' | 'あずさ';
-export type Shop = { id: string; date: string; author: Author; url: string; visited: boolean; row: number };
-export type NewShop = { url: string; author: Author };
+export type Shop = { id: string; date: string; author: Author; url: string; visited: boolean; row: number; tags?: string[] };
+export type NewShop = { url: string; author: Author; tags?: string[] };
 export class AppError extends Error {
   constructor(message: string, public status = 400, public existing?: Shop) { super(message); }
 }
@@ -25,20 +26,22 @@ export function japanDate(date = new Date()): string {
 }
 export function parseRows(rows: unknown[][]): Shop[] {
   const headers = (rows[0] ?? []).map(v => String(v ?? '').trim().replace(/^\uFEFF/, ''));
-  if (headers.length !== 5 || new Set(headers).size !== 5 || HEADERS.some(h => !headers.includes(h))) {
-    throw new AppError('列の構成が違います。5列のヘッダー（ID／書いた日にち／書いた人／Google mapのURL／行ったかどうか）を確認してください。');
+  if (![5,6].includes(headers.length) || new Set(headers).size !== headers.length || (headers.length === 6 && !headers.includes('タグ')) || HEADERS.some(h => !headers.includes(h))) {
+    throw new AppError('列の構成が違います。基本5列と、任意の「タグ」列を確認してください。');
   }
   const at = (row: unknown[], name: typeof HEADERS[number]) => String(row[headers.indexOf(name)] ?? '').trim();
   const result: Shop[] = [];
   rows.slice(1).forEach((row, index) => {
-    if (row.length > 5 && row.slice(5).some(v => String(v ?? '').trim())) throw new AppError(`${index + 2}行目に想定外の列があります。`);
+    if (row.length > headers.length && row.slice(headers.length).some(v => String(v ?? '').trim())) throw new AppError(`${index + 2}行目に想定外の列があります。`);
     const [id, date, author, url, state] = HEADERS.map(h => at(row, h));
-    if (!id && !date && !author && !url && ['', 'FALSE'].includes(state.toUpperCase())) return;
+    let tags: string[];
+    try { tags = parseTagsCell(headers.includes('タグ') ? row[headers.indexOf('タグ')] : undefined); } catch(e) { throw new AppError(`${index+2}行目: ${(e as Error).message}`); }
+    if (!tags.length && !id && !date && !author && !url && ['', 'FALSE'].includes(state.toUpperCase())) return;
     if (!['', 'TRUE', 'FALSE'].includes(state.toUpperCase())) throw new AppError(`${index + 2}行目の訪問状態をTRUE／FALSEにしてください。`);
     assertAuthor(author);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date)) || new Date(date).toISOString().slice(0,10) !== date) throw new AppError(`${index + 2}行目の日付をYYYY-MM-DDにしてください。`);
     if (id && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new AppError(`${index + 2}行目のIDはUUIDにしてください。`);
-    result.push({ id, date, author, url: mapsUrl(url), visited: state.toUpperCase() === 'TRUE', row: index + 2 });
+    result.push({ tags, id, date, author, url: mapsUrl(url), visited: state.toUpperCase() === 'TRUE', row: index + 2 });
   });
   return result;
 }
@@ -59,8 +62,10 @@ export function duplicate(shops: Shop[], url: string) {
 }
 export function createShop(input: NewShop): Shop {
   assertAuthor(input.author);
-  return { id: crypto.randomUUID(), date: japanDate(), author: input.author, url: mapsUrl(input.url), visited: false, row: 0 };
+  let tags: string[];
+  try { tags = normalizeTags(input.tags ?? []); } catch(e) { throw new AppError((e as Error).message); }
+  return { tags, id: crypto.randomUUID(), date: japanDate(), author: input.author, url: mapsUrl(input.url), visited: false, row: 0 };
 }
 export function toRows(shops: Shop[]): unknown[][] {
-  return [[...HEADERS], ...shops.map(s => [s.id, s.date, s.author, s.url, s.visited])];
+  return [[...HEADERS, 'タグ'], ...shops.map(s => [s.id, s.date, s.author, s.url, s.visited, JSON.stringify(s.tags ?? [])])];
 }

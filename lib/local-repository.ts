@@ -1,3 +1,4 @@
+import { normalizeTags } from './tags';
 import { AppError, createShop, duplicate, parseCsv, parseRows, toRows, uniqueShop, type NewShop, type Shop } from './model';
 import type { ShopRepository } from './repository';
 export const STORAGE_KEY = 'ikitai-omise.demo.v1';
@@ -29,6 +30,7 @@ export class LocalRepository implements ShopRepository {
   async add(input: NewShop) { const shop = createShop(input); return this.edit(shops => { duplicate(shops, shop.url); shops.push(shop); return shop; }); }
   async remove(id: string) { await this.edit(shops => { const shop = uniqueShop(shops, id); shops.splice(shops.indexOf(shop), 1); }); }
   async setVisited(id: string, visited: boolean) { await this.edit(shops => { uniqueShop(shops, id).visited = visited; }); }
+  async setTags(id: string, tags: string[]) { const value = normalizeTags(tags); await this.edit(shops => { uniqueShop(shops, id).tags = value; }); }
   async fillMissingIds() { return this.edit(shops => { let n = 0; shops.forEach(s => { if (!s.id) { s.id = crypto.randomUUID(); n++; } }); return n; }); }
   async reset() { const shops = parseCsv(await this.seed()); this.write(shops); }
 }

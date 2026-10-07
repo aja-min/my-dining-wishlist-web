@@ -1,4 +1,5 @@
 import { type NextRequest } from 'next/server';
+import { normalizeTags } from '@/lib/tags';
 import { AppError } from '@/lib/model';
 import { googleRepository } from '@/lib/google-server';
 export const dynamic = 'force-dynamic';
@@ -15,16 +16,23 @@ async function handle(request: NextRequest) {
     let body;
     try { body = JSON.parse(text); } catch { throw new AppError('入力形式が不正です。'); }
     if (!body || typeof body !== 'object' || Array.isArray(body)) throw new AppError('入力形式が不正です。');
+    let tags: string[] | undefined;
+    if (Object.hasOwn(body, 'tags')) { try { tags = normalizeTags(body.tags); } catch(e) { throw new AppError((e as Error).message); } }
     if (request.method === 'POST') {
       if (body.action === 'fillMissingIds') return Response.json({ count: await repository.fillMissingIds() });
       if (typeof body.url !== 'string') throw new AppError('Google MapsのURLを入力してください。');
       // Author supplied by a client is deliberately ignored; adapter uses server identity.
-      return Response.json({ shop: await repository.add({ url: body.url, author:'なおと' }) }, { status:201 });
+      return Response.json({ shop: await repository.add({ url: body.url, author:'なおと', tags }) }, { status:201 });
     }
     if (typeof body.id !== 'string' || body.id.length > 100) throw new AppError('IDが不正です。');
     if (request.method === 'PATCH') {
+      if (tags !== undefined) {
+        if (Object.hasOwn(body, 'visited')) throw new AppError('更新内容を1つだけ指定してください。');
+        await repository.setTags(body.id, tags);
+      } else {
       if (typeof body.visited !== 'boolean') throw new AppError('訪問状態が不正です。');
       await repository.setVisited(body.id, body.visited);
+      }
     } else if (request.method === 'DELETE') await repository.remove(body.id);
     return Response.json({ ok:true });
   } catch (error) {

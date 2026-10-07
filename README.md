@@ -44,6 +44,7 @@ npm start
 | C | 書いた人 | なおと／あずさ |
 | D | Google mapのURL | HTTPSのGoogle Maps URL |
 | E | 行ったかどうか | TRUE＝行った、FALSE・空欄＝まだ |
+| F | タグ | 空欄または文字列のJSON配列。アプリで編集 |
 
 Papa Parseでクォート・カンマ・改行・BOMを処理します。ヘッダー名から列を対応付け、ヘッダーの過不足・重複や不正値はエラーにします。完全な空行と、E列だけFALSEでA〜Dが空の行を無視します。TRUEだけ入った行や、日付・書いた人・URLが欠けた不完全な行はエラーにし、黙って捨てません。IDの空欄だけは許容します。
 
@@ -88,7 +89,7 @@ Life Logと同じく、Googleログインによる本人確認と、サービス
 4. Webアプリケーション用のOAuthクライアントを作成します。承認済みJavaScript生成元は `http://localhost:3001`、リダイレクトURIは **`http://localhost:3001/api/auth/callback/google`** にします。
 5. `GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET`、`NAOTO_EMAIL`、`AZUSA_EMAIL` を設定します。メールは異なる2つが必要です。`NEXTAUTH_SECRET` は `openssl rand -base64 32` で生成します。`NEXTAUTH_URL=http://localhost:3001` とアクセスURLを揃えてください。
 6. 専用サービスアカウントを作成し、対象スプレッドシートを**サービスアカウントに編集者として共有**します。プロジェクト管理者ロールは不要です。鍵のclient_emailとprivate_keyを `GOOGLE_SERVICE_ACCOUNT_EMAIL` と `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` に設定します。JSON鍵はGitへ入れません。
-7. `GOOGLE_SPREADSHEET_ID=1Wm7dB8nt_BykgeZ2j5gLJqx5Xs67e2Y7vB2oJRFJZRE`、`GOOGLE_SHEET_TAB=お店` を確認します。A〜E列は指定のヘッダー順にし、B列の表示形式を `yyyy-mm-dd`、E列をチェックボックスにしてください。余分なデータ列は受け付けません。
+7. `GOOGLE_SPREADSHEET_ID=1Wm7dB8nt_BykgeZ2j5gLJqx5Xs67e2Y7vB2oJRFJZRE`、`GOOGLE_SHEET_TAB=お店` を確認します。A〜E列は指定のヘッダー順にし、B列の表示形式を `yyyy-mm-dd`、E列をチェックボックスにしてください。F列に「タグ」を追加できます。それ以外の余分なデータ列は受け付けません。
 8. `DATA_MODE=google` に変更してサーバーを再起動します。同じUIがSheets Adapterを使用し、デモユーザー切り替え・デモリセットは表示されなくなります。設定不足はログイン画面で案内します。
 9. それぞれのGoogleアカウントでログインし、本人確認のみを許可します。別々のブラウザプロファイルでの確認を推奨します。
 
@@ -106,7 +107,7 @@ Life Logと同じく、Googleログインによる本人確認と、サービス
 
 ### Sheetsの書き込みと競合
 
-- 追加は実データの最初の空き行に行を挿入し、A〜Eの5セルを同じbatchUpdateで書き込みます。チェックボックスだけの行を追加位置の判定に含めません。
+- 追加は実データの最初の空き行に行を挿入し、A〜Eと、タグ指定時はF列を同じbatchUpdateで書き込みます。チェックボックスだけの行を追加位置の判定に含めません。
 - 訪問更新は、直前の再取得でIDに一致する唯一の行を探し、**そのE列だけ**に目的状態TRUE/FALSEを書きます。反転命令は送りません。
 - 削除は、タブの数値IDを取得し、最新データのIDから解決した行をdeleteDimensionで削除します。画面の並びや検索後の配列位置をSheets行番号に使用しません。
 - 読み取りはID補完を書き込みません。画面の「IDを補完」→確認で、実データのあるID空欄行のA列だけを補完します。日付・書いた人・URLが不正な行は先にスプレッドシートで修正してください。
@@ -189,3 +190,11 @@ Google Auth Platformのデータアクセスからユーザー向けSheetsスコ
 Google Maps共有URLの転送先などに含まれる日本語住所から、都道府県を判定します。東京都を選ぶと区・市町村でも絞り込めます。住所が取れない場合は「特定不可」とし、店名や地図の中心座標から推測しません。住所の取得中は残り件数を表示します。地域情報はプレビューにのみ保持し、スプレッドシートの列や保存済みデータは変更しません。
 
 地域UIの検証: デモモードで起動したサーバーに対して `TEST_BASE_URL=http://127.0.0.1:3103 node tests/region-browser.mjs`。
+
+### 手動タグ
+
+「デザート」「居酒屋」「ビストロ」「ランチ」をプリセットに、登録時・カードの「タグを編集」から複数選択と自由入力ができます。自由入力のタグもほかのお店で候補から選べます。選択したタグを押すと外れ、「保存する」で反映します。タグなしの店舗に特別な表示や絞り込みはありません。
+
+タグは1個32文字、1店舗20個まで。F列にはJSON配列としてRAWで保存し、タグ編集時は最新のIDに対応するFセルだけを更新します。旧5列のCSV・ローカル保存データも読めます。Google Sheetsでは、互換版のデプロイ後に `node --conditions=react-server --import tsx scripts/enable-tags.ts` を実行してF1だけに「タグ」を設定します。既存A〜Eセルは書き換えません。列追加後は旧5列専用版にロールバックしないでください。
+
+ブラウザ検証: `TEST_BASE_URL=http://127.0.0.1:3104 node tests/tags-browser.mjs`（デモサーバーを使用）。

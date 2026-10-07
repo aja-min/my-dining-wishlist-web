@@ -11,8 +11,9 @@ export class HttpRepository implements ShopRepository {
     return data;
   }
   async list(): Promise<Shop[]> { return (await this.request('GET')).shops; }
-  async add(input: NewShop): Promise<Shop> { return (await this.request('POST', { url: input.url })).shop; }
+  async add(input: NewShop): Promise<Shop> { return (await this.request('POST', { url: input.url, tags: input.tags })).shop; }
   async remove(id: string) { await this.request('DELETE', { id }); }
   async setVisited(id: string, visited: boolean) { await this.request('PATCH', { id, visited }); }
+  async setTags(id: string, tags: string[]) { await this.request('PATCH', { id, tags }); }
   async fillMissingIds(): Promise<number> { return (await this.request('POST', { action: 'fillMissingIds' })).count; }
 }

@@ -4,5 +4,6 @@ export interface ShopRepository {
   add(input: NewShop): Promise<Shop>;
   remove(id: string): Promise<void>;
   setVisited(id: string, visited: boolean): Promise<void>;
+  setTags(id: string, tags: string[]): Promise<void>;
   fillMissingIds(): Promise<number>;
 }

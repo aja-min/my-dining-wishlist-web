@@ -25,7 +25,7 @@ try{
  for(const width of [1365,768,390,320]){
   await page.setViewportSize({width,height:900});
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`overflow at ${width}`);
-  const boxes=await page.locator('.region-filters select').evaluateAll(elements=>elements.map(el=>{const r=el.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,height:r.height};}));
+  const boxes=await page.locator('.region-filters select:not([aria-label="タグで絞り込み"])').evaluateAll(elements=>elements.map(el=>{const r=el.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,height:r.height};}));
   assert.ok(boxes.every(b=>b.height>=44 && b.left>=0 && b.right<=width));
   assert.ok(boxes[0].right<=boxes[1].left || boxes[0].bottom<=boxes[1].top || boxes[1].right<=boxes[0].left);
   await page.screenshot({path:`test-results/region-${width}.png`,fullPage:true});
