@@ -56,7 +56,7 @@ export async function requireGoogleUser(request: NextRequest) {
   if (!author || token?.emailVerified !== true) throw new AppError('許可されたGoogleアカウントでログインしてください。', 401);
   token = await refreshGoogleToken(token, process.env.GOOGLE_CLIENT_ID!, process.env.GOOGLE_CLIENT_SECRET!);
   if (token.authError === 'RefreshFailed') throw new AppError('Googleとの接続を更新できませんでした。少し待って再読み込みしてください。', 503);
-  if (token.authError === 'ReconnectRequired') throw new AppError('Googleとの再接続が必要です。ログイン画面の「Googleと再接続」から進んでください。', 401);
+  if (token.authError === 'ReconnectRequired') throw new AppError('Googleとの再接続が必要です。「再ログインする」から進んでください。', 401);
   if (!token.sheetsGranted) throw new AppError('スプレッドシートの編集権限への同意が必要です。再ログインしてください。', 403);
   if (typeof token.accessToken !== 'string' || typeof token.accessExpires !== 'number' || Date.now() >= token.accessExpires - 30_000) throw new AppError('Googleの接続期限が切れました。再ログインしてください。', 401);
   return { author, accessToken: token.accessToken };
