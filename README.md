@@ -74,7 +74,7 @@ app/api/preview/route.ts     認証と表示情報取得のAPI境界
 lib/query.ts                 検索・フィルタ・並び替え
 ```
 
-参照元は `/Users/ajamin/develop/my-lifelog-web` の `AGENTS.md`、`lib/auth.ts`、`lib/googleDrive.ts`、`app/globals.css`、`.env.example`、`package.json` です。参照元は変更していません。Next.js 16.3.6／React 19.3.0／TypeScript／NextAuth 4.24.15、白・くすみ水色、サーバー境界での認可、JWTセッション（8時間）を引き継ぎました。Next.js同梱ドキュメントでApp RouterとRoute Handlerを確認しています。
+参照元は `/Users/ajamin/develop/my-lifelog-web` の `AGENTS.md`、`lib/auth.ts`、`lib/googleDrive.ts`、`app/globals.css`、`.env.example`、`package.json` です。参照元は変更していません。Next.js 16.3.6／React 19.3.0／TypeScript／NextAuth 4.24.15、白・くすみ水色、サーバー境界での認可、JWTセッション（30日間）を引き継ぎました。Next.js同梱ドキュメントでApp RouterとRoute Handlerを確認しています。
 
 既存実装はGoogleログイン（単一許可アカウント）と、別のサービスアカウントによるDrive閲覧を分離しています。本アプリは要件に合わせ、2アカウントの許可リストと**その操作をした本人のOAuth権限**に変更しました。サービスアカウント鍵や相手のトークンは使用しません。
 
@@ -101,7 +101,7 @@ lib/query.ts                 検索・フィルタ・並び替え
 - `openid email profile` に `https://www.googleapis.com/auth/spreadsheets` を追加します。既存Drive閲覧権限やサービスアカウントは流用しません。再ログイン時に同意画面を表示します。
 - 指定済みIDのスプレッドシートを直接開く構成なので、Sheets編集スコープを使用します。このOAuthスコープ自体は1ファイルに限定できません。アプリのAPI境界では環境変数で設定した1ファイル・1タブに限定しています。より狭い `drive.file` を使うにはGoogle Picker等で対象ファイルを承認する追加フローが必要です（未実装）。
 - Googleアクセストークンは暗号化されたHttpOnlyのNextAuth JWT Cookie内に保持し、クライアント向けセッションレスポンスには含めません。localStorage・CSV・Git・ログには保存しません。HTTPS環境ではSecure Cookieを利用します。
-- **自動トークン更新は未実装**です。Googleのアクセストークン期限（通常約1時間）が切れたら、8時間のアプリセッション内でも再ログインが必要です。refresh_tokenは要求・保存しません。期限切れや権限不足を画面で案内し、保存したように扱いません。
+- Googleアクセストークンは期限前に自動更新します。更新用トークンは暗号化されたHttpOnly Cookieに保持し、セッションAPIには返しません。通常ログインは同意を強制しません。既存ユーザーや許可を取り消した場合はログイン画面の「Googleと再接続」で一度再承認してください。Google側がテスト公開の場合など、更新用トークン自体が失効すると再接続が必要です。セッションの有効期間は30日で、利用時に更新されます。
 - 本番利用前に、ふたりのアカウント、第三者拒否、共有権限なし、同意拒否、期限切れを実環境で検証してください。
 
 ### Sheetsの書き込みと競合

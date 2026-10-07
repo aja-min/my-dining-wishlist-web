@@ -1,7 +1,10 @@
+import { getSession } from 'next-auth/react';
 import { AppError, type Shop, type NewShop } from './model';
 import type { ShopRepository } from './repository';
 export class HttpRepository implements ShopRepository {
   private async request(method: string, body?: unknown) {
+    // NextAuth refreshes and persists the encrypted token cookie before the API request.
+    await getSession();
     const response = await fetch('/api/shops', { method, credentials: 'same-origin', cache:'no-store', headers: { 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) });
     const data = await response.json();
     if (!response.ok) throw new AppError(data.error ?? '通信に失敗しました。再読み込みしてください。', response.status, data.existing);
