@@ -63,7 +63,7 @@ lib/repository.ts            list/add/remove/setVisited/fillMissingIdsの共通�
 lib/local-repository.ts      CSV初期値＋localStorage
 lib/http-repository.ts       認証済みサーバーAPIへのクライアントAdapter
 lib/sheets-repository.ts     Sheets Adapter（IDから最新行番号を解決）
-lib/google-server.ts         1ユーザーのOAuthトークンと設定対象に束縛した通信
+lib/google-server.ts         サービスアカウントと設定対象に束縛した通信
 lib/auth.ts                  NextAuth、アカウント許可・表示名対応
 lib/maps-embed.ts            元URLの場所ID・CID・queryからGoogle埋め込みURLを生成
 lib/preview.ts               URLのパス・query/qから検索用の表示情報を解釈
@@ -76,7 +76,7 @@ lib/query.ts                 検索・フィルタ・並び替え
 
 参照元は `/Users/ajamin/develop/my-lifelog-web` の `AGENTS.md`、`lib/auth.ts`、`lib/googleDrive.ts`、`app/globals.css`、`.env.example`、`package.json` です。参照元は変更していません。Next.js 16.3.6／React 19.3.0／TypeScript／NextAuth 4.24.15、白・くすみ水色、サーバー境界での認可、JWTセッション（30日間）を引き継ぎました。Next.js同梱ドキュメントでApp RouterとRoute Handlerを確認しています。
 
-既存実装はGoogleログイン（単一許可アカウント）と、別のサービスアカウントによるDrive閲覧を分離しています。本アプリは要件に合わせ、2アカウントの許可リストと**その操作をした本人のOAuth権限**に変更しました。サービスアカウント鍵や相手のトークンは使用しません。
+Life Logと同じく、Googleログインによる本人確認と、サービスアカウントによるデータアクセスを分離しています。許可メールは利用者ごとに複数設定できます。Google上の書き込み主体はサービスアカウントですが、書いた人は認証済みユーザーからサーバーで決定します。
 
 ## Google Sheetsへの切り替え
 
@@ -87,21 +87,21 @@ lib/query.ts                 検索・フィルタ・並び替え
 3. OAuth同意画面を設定し、テスト公開の場合は夫婦のGoogleアカウントをテストユーザーに追加します。
 4. Webアプリケーション用のOAuthクライアントを作成します。承認済みJavaScript生成元は `http://localhost:3001`、リダイレクトURIは **`http://localhost:3001/api/auth/callback/google`** にします。
 5. `GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET`、`NAOTO_EMAIL`、`AZUSA_EMAIL` を設定します。メールは異なる2つが必要です。`NEXTAUTH_SECRET` は `openssl rand -base64 32` で生成します。`NEXTAUTH_URL=http://localhost:3001` とアクセスURLを揃えてください。
-6. 対象スプレッドシートを**両方のGoogleアカウントに編集者として共有**します。ログイン許可とSheetsの編集権限は別です。
+6. 専用サービスアカウントを作成し、対象スプレッドシートを**サービスアカウントに編集者として共有**します。プロジェクト管理者ロールは不要です。鍵のclient_emailとprivate_keyを `GOOGLE_SERVICE_ACCOUNT_EMAIL` と `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` に設定します。JSON鍵はGitへ入れません。
 7. `GOOGLE_SPREADSHEET_ID=1Wm7dB8nt_BykgeZ2j5gLJqx5Xs67e2Y7vB2oJRFJZRE`、`GOOGLE_SHEET_TAB=お店` を確認します。A〜E列は指定のヘッダー順にし、B列の表示形式を `yyyy-mm-dd`、E列をチェックボックスにしてください。余分なデータ列は受け付けません。
 8. `DATA_MODE=google` に変更してサーバーを再起動します。同じUIがSheets Adapterを使用し、デモユーザー切り替え・デモリセットは表示されなくなります。設定不足はログイン画面で案内します。
-9. それぞれのGoogleアカウントでログインし、Sheetsへの編集権限に同意します。別々のブラウザプロファイルでの確認を推奨します。
+9. それぞれのGoogleアカウントでログインし、本人確認のみを許可します。別々のブラウザプロファイルでの確認を推奨します。
 
 モードは**サーバー側環境変数**で切り替えます。URLパラメータやフロントからのユーザー名で本番認証を迂回することはできません。ローカルモードではSheets APIは全操作を拒否し、デモデータを実スプレッドシートへ送るインポート処理もありません。
 
 ### 認証・認可とトークン
 
 - NextAuthのGoogle OAuth/OIDCフローで認証結果を検証し、`email_verified` とサーバーの許可メールを確認します。表示名はサーバー設定から決定し、APIに渡された書いた人は無視します。
-- 全てのSheets API操作でJWTの検証、許可アカウント、Googleトークン期限、Sheetsスコープを再確認します。書き込みは同一Origin＋JSONに限定します。NextAuthのログイン処理はNextAuthのCSRF保護を使います。
-- `openid email profile` に `https://www.googleapis.com/auth/spreadsheets` を追加します。既存Drive閲覧権限やサービスアカウントは流用しません。再ログイン時に同意画面を表示します。
-- 指定済みIDのスプレッドシートを直接開く構成なので、Sheets編集スコープを使用します。このOAuthスコープ自体は1ファイルに限定できません。アプリのAPI境界では環境変数で設定した1ファイル・1タブに限定しています。より狭い `drive.file` を使うにはGoogle Picker等で対象ファイルを承認する追加フローが必要です（未実装）。
-- Googleアクセストークンは暗号化されたHttpOnlyのNextAuth JWT Cookie内に保持し、クライアント向けセッションレスポンスには含めません。localStorage・CSV・Git・ログには保存しません。HTTPS環境ではSecure Cookieを利用します。
-- Googleアクセストークンは期限前に自動更新します。更新用トークンは暗号化されたHttpOnly Cookieに保持し、セッションAPIには返しません。通常ログインは同意を強制しません。既存ユーザーや許可を取り消した場合はエラー画面の「再ログインする」から進んで一度再承認してください。ログイン画面のボタンは1つで、再接続が必要なときだけ同意を求めます。Google側がテスト公開の場合など、更新用トークン自体が失効すると再接続が必要です。セッションの有効期間は30日で、利用時に更新されます。
+- 全てのSheets API操作でJWT、検証済みメール、現在の許可アカウントを確認します。書き込みは同一Origin＋JSONに限定します。
+- ユーザーのGoogleログインには `openid email profile` だけを要求し、Sheetsスコープ・offline access・同意の強制は行いません。
+- Sheetsへの通信は専用サービスアカウントの `spreadsheets` 権限を使います。API境界で設定済みの1ファイル・1タブに限定し、サービスアカウントへの共有も対象シートだけにします。
+- サービスアカウント鍵はサーバー専用環境変数に保存します。アクセストークンの更新はGoogle公式ライブラリが処理します。鍵・トークンはクライアントやログへ返しません。
+- ログインセッションは暗号化されたHttpOnly Cookieで30日間有効です。旧セッション内のユーザー用Googleトークンはセッションアクセス時に削除します。Google APIの接続期限によるユーザーの再承認は不要です。
 - 本番利用前に、ふたりのアカウント、第三者拒否、共有権限なし、同意拒否、期限切れを実環境で検証してください。
 
 ### Sheetsの書き込みと競合
@@ -170,7 +170,7 @@ npm run test:browser  # インストール済みGoogle Chromeを使用
 
 ### 同じ人が複数のGoogleアカウントを使う場合
 
-`AZUSA_EMAIL`（`NAOTO_EMAIL`も同様）はカンマ区切りで複数指定できます。例: `AZUSA_EMAIL=first@example.com,second@example.com`。どちらも同じ書いた人として扱います。全アカウントをOAuthのテストユーザーに登録し、対象スプレッドシートの編集権限を付けてください。なおと・あずさの両方に同じメールを設定した場合は認証を無効にします。環境変数の変更後はサーバーを再起動してください。
+`AZUSA_EMAIL`（`NAOTO_EMAIL`も同様）はカンマ区切りで複数指定できます。例: `AZUSA_EMAIL=first@example.com,second@example.com`。どちらも同じ書いた人として扱います。テスト公開の場合は全アカウントをOAuthのテストユーザーに登録してください。アプリからの編集には利用者個別のスプシ共有は不要で、サービスアカウントの編集権限を使用します。なおと・あずさの両方に同じメールを設定した場合は認証を無効にします。環境変数の変更後はサーバーを再起動してください。
 
 ## Vercel運用
 
@@ -179,3 +179,7 @@ npm run test:browser  # インストール済みGoogle Chromeを使用
 本番URL: https://my-dining-wishlist-web.vercel.app
 
 GitHubの `aja-min/my-dining-wishlist-web` とVercelを連携しています。`main` へのpushで本番を自動デプロイします。Google OAuthの承認済みリダイレクトURIには `https://my-dining-wishlist-web.vercel.app/api/auth/callback/google` を登録してください。
+
+### ユーザーOAuthからの切り替え
+
+Google Auth Platformのデータアクセスからユーザー向けSheetsスコープを削除し、基本のopenid/email/profileだけにします。既存ユーザーは一度ログアウトして再ログインしてください。サービスアカウントでは対象シートの読み取りと、実データ変更のない置換リクエストによる編集権限確認を実施済みです。実ユーザーの新方式でのGoogleログインは別途確認してください。

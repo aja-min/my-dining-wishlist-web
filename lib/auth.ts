@@ -5,8 +5,7 @@ import { getToken } from 'next-auth/jwt';
 import type { NextRequest } from 'next/server';
 import { AppError, type Author } from './model';
 import { allowedAccounts } from './allowed-accounts';
-import { refreshGoogleToken, SHEETS_SCOPE } from './refresh-google-token';
-export { SHEETS_SCOPE } from './refresh-google-token';
+import { identityToken } from './identity-token';
 export function dataMode() { return process.env.DATA_MODE === 'google' || (!process.env.DATA_MODE && process.env.VERCEL) ? 'google' : 'local'; }
 export function displayName(email?: string | null): Author | null {
   return allowedAccounts(process.env.NAOTO_EMAIL, process.env.AZUSA_EMAIL).displayName(email);
@@ -16,7 +15,7 @@ export function authConfigured() {
 }
 export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
-  providers: [GoogleProvider({ clientId: process.env.GOOGLE_CLIENT_ID ?? '', clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '', authorization: { params: { prompt: 'select_account', scope: `openid email profile ${SHEETS_SCOPE}`, access_type: 'offline' } } })],
+  providers: [GoogleProvider({ clientId: process.env.GOOGLE_CLIENT_ID ?? '', clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '', authorization: { params: { prompt: 'select_account', scope: 'openid email profile' } } })],
   session: { strategy: 'jwt', maxAge: 30 * 24 * 60 * 60 },
   pages: { signIn:'/login', error:'/login' },
   callbacks: {
@@ -24,19 +23,11 @@ export const authOptions: NextAuthOptions = {
       return dataMode() === 'google' && authConfigured() && account?.provider === 'google' && (profile as { email_verified?: boolean })?.email_verified === true && Boolean(displayName(profile?.email));
     },
     async jwt({ token, account, profile }) {
-      if (account) {
-        token.refreshToken = account.refresh_token;
-        token.authError = undefined;
-        token.accessToken = account.access_token;
-        token.accessExpires = (account.expires_at ?? 0) * 1000;
-        token.emailVerified = (profile as { email_verified?: boolean })?.email_verified === true;
-        token.sheetsGranted = account.scope?.split(' ').includes(SHEETS_SCOPE) === true;
-      }
-      if (!displayName(token.email) || token.emailVerified !== true) return token;
-      return refreshGoogleToken(token, process.env.GOOGLE_CLIENT_ID!, process.env.GOOGLE_CLIENT_SECRET!);
+      return identityToken(token, account ? (profile as { email_verified?: boolean })?.email_verified === true : undefined);
     },
     async session({ session, token }) {
       // No Google token is exposed through /api/auth/session or client props.
+      if (token.emailVerified !== true || !displayName(token.email)) { session.user = undefined; return session; }
       if (session.user) { session.user.email = token.email; session.user.name = displayName(token.email); session.user.image = null; }
       return session;
     },
@@ -51,13 +42,8 @@ export async function currentUser() {
 export async function requireGoogleUser(request: NextRequest) {
   if (dataMode() !== 'google') throw new AppError('デモモードではGoogle Sheetsにアクセスしません。', 403);
   if (!authConfigured()) throw new AppError('Googleログインの環境変数が未設定です。READMEを確認してください。', 503);
-  let token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
+  const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
   const author = displayName(token?.email);
   if (!author || token?.emailVerified !== true) throw new AppError('許可されたGoogleアカウントでログインしてください。', 401);
-  token = await refreshGoogleToken(token, process.env.GOOGLE_CLIENT_ID!, process.env.GOOGLE_CLIENT_SECRET!);
-  if (token.authError === 'RefreshFailed') throw new AppError('Googleとの接続を更新できませんでした。少し待って再読み込みしてください。', 503);
-  if (token.authError === 'ReconnectRequired') throw new AppError('Googleとの再接続が必要です。「再ログインする」から進んでください。', 401);
-  if (!token.sheetsGranted) throw new AppError('スプレッドシートの編集権限への同意が必要です。再ログインしてください。', 403);
-  if (typeof token.accessToken !== 'string' || typeof token.accessExpires !== 'number' || Date.now() >= token.accessExpires - 30_000) throw new AppError('Googleの接続期限が切れました。再ログインしてください。', 401);
-  return { author, accessToken: token.accessToken };
+  return { author };
 }

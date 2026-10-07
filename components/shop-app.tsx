@@ -22,7 +22,6 @@ export default function ShopApp({ mode, initialAuthor }: { mode:'local'|'google'
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [reconnect, setReconnect] = useState(false);
   const [notice, setNotice] = useState('');
   const [dialogState, setDialogState] = useState<DialogState>(null);
   const [url, setUrl] = useState('');
@@ -41,7 +40,7 @@ export default function ShopApp({ mode, initialAuthor }: { mode:'local'|'google'
     const version = ++generation.current;
     setLoading(true); setError('');
     try { const items = await repository.current.list(); if (version === generation.current) setShops(items); }
-    catch (e) { if (version === generation.current) { setReconnect(e instanceof AppError && (e.status === 401 || e.status === 403)); setError(e instanceof Error ? e.message : '読み込みに失敗しました。'); } }
+    catch (e) { if (version === generation.current) { setError(e instanceof Error ? e.message : '読み込みに失敗しました。'); } }
     finally { loadingRef.current = false; if (version === generation.current) setLoading(false); }
   }, []);
   useEffect(() => {
@@ -72,7 +71,6 @@ export default function ShopApp({ mode, initialAuthor }: { mode:'local'|'google'
       await action(); saved = true; setDialogState(null);
       const items = await repository.current.list(); setShops(items); setNotice(message);
     } catch (e) {
-      setReconnect(e instanceof AppError && (e.status === 401 || e.status === 403));
       const text = e instanceof Error ? e.message : '保存できませんでした。';
       if (inDialog && !saved) { setFormError(text); if (e instanceof AppError && e.existing) setExisting(e.existing); }
       else setError(saved ? `保存は完了しましたが、再取得できませんでした。再読み込みしてください。${text}` : text);
@@ -96,7 +94,7 @@ export default function ShopApp({ mode, initialAuthor }: { mode:'local'|'google'
       <div className="summary"><Bookmark size={17} /><span>まだ行っていないお店 <strong>{remaining}</strong> 件</span><span className="summary-divider"/><Check size={17} /><span>行ったお店 <strong>{shops.length - remaining}</strong> 件</span></div>
       <section className="filters" aria-label="お店の検索と絞り込み"><label className="search"><Search size={20}/><span className="sr-only">登録したお店を検索</span><input type="search" placeholder="店名、書いた人、URLで検索" value={query} onChange={e => setQuery(e.target.value)} /></label><div className="filter-row"><div className="filter-group"><span id="status-label">訪問状態</span><div className="segments" role="group" aria-labelledby="status-label">{['すべて','まだ','行った'].map(value => <button key={value} aria-pressed={status === value} onClick={() => setStatus(value)}>{value === '行った' && <Check size={14}/>} {value}</button>)}</div></div><label className="select-label">書いた人<select aria-label="書いた人" value={by} onChange={e => setBy(e.target.value)}><option>全員</option><option>なおと</option><option>あずさ</option></select></label><label className="select-label sort">登録日<select aria-label="登録日" value={order} onChange={e => setOrder(e.target.value)}><option>新しい順</option><option>古い順</option></select></label></div></section>
       <div className="results-bar"><p aria-live="polite"><strong>{visible.length}</strong> 件のお店 <span className="muted">{`／ 全 ${shops.length} 件`}</span></p><button className="quiet" onClick={() => {void refresh();setPreviewRefresh(value=>value+1);}} disabled={busy || loading}><RefreshCw size={15} className={loading ? 'spinning' : ''}/>{loading ? '読み込み中' : '再読み込み'}</button></div>
-      {error && <div className="message error" role="alert"><AlertCircle size={18}/><div>{error}{!demo && <p><a href={reconnect ? '/login?reconnect=1' : '/login'}>再ログインする</a></p>}</div></div>}
+      {error && <div className="message error" role="alert"><AlertCircle size={18}/><div>{error}{!demo && <p><a href="/login">再ログインする</a></p>}</div></div>}
       {notice && <div className="message success" role="status"><Check size={18}/>{notice}</div>}
       {busy && <div className="saving" role="status">保存中…</div>}
       {(missing > 0 || repeated) && <div className="message warning"><div>{missing > 0 && <p>IDのないお店が {missing} 件あります。更新する前にIDを補完してください。</p>}{repeated && <p>IDが重複したお店は更新・削除できません。元データのIDを修正してください。</p>}</div>{missing > 0 && <button disabled={busy || loading} onClick={() => open({type:'ids'})}>IDを補完</button>}</div>}

@@ -3,7 +3,7 @@ import { AppError, type Shop, type NewShop } from './model';
 import type { ShopRepository } from './repository';
 export class HttpRepository implements ShopRepository {
   private async request(method: string, body?: unknown) {
-    // NextAuth refreshes and persists the encrypted token cookie before the API request.
+    // Renew the login session cookie and remove legacy Google API credentials.
     await getSession();
     const response = await fetch('/api/shops', { method, credentials: 'same-origin', cache:'no-store', headers: { 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) });
     const data = await response.json();
