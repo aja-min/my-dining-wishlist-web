@@ -15,5 +15,11 @@ export class HttpRepository implements ShopRepository {
   async remove(id: string) { await this.request('DELETE', { id }); }
   async setVisited(id: string, visited: boolean) { await this.request('PATCH', { id, visited }); }
   async setTags(id: string, tags: string[]) { await this.request('PATCH', { id, tags }); }
+  async like(id:string,operationId:string) {
+    for(let attempt=0;attempt<2;attempt++) {
+      try {await this.request('PATCH',{id,action:'like',operationId});return;}
+      catch(error){if(attempt===1 || (error instanceof AppError && error.status<500))throw error;}
+    }
+  }
   async fillMissingIds(): Promise<number> { return (await this.request('POST', { action: 'fillMissingIds' })).count; }
 }

@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { MapPin, Plus, Search, ArrowUpRight, Check, RotateCcw, RefreshCw, Trash2, X, Bookmark, Coffee, AlertCircle } from 'lucide-react';
+import { Heart, MapPin, Plus, Search, ArrowUpRight, Check, RotateCcw, RefreshCw, Trash2, X, Bookmark, Coffee, AlertCircle } from 'lucide-react';
 import { AppError, mapsUrl, type Author, type Shop } from '@/lib/model';
 import { LocalRepository, loadSeed } from '@/lib/local-repository';
 import { HttpRepository } from '@/lib/http-repository';
@@ -32,6 +32,10 @@ export default function ShopApp({ mode, initialAuthor }: { mode:'local'|'google'
   const [status, setStatus] = useState('まだ');
   const [order, setOrder] = useState('新しい順');
   const [loading, setLoading] = useState(true);
+  const [liking,setLiking]=useState(false);
+  const [likePending,setLikePending]=useState(0);
+  const likeQueue=useRef<{id:string;operation:string}[]>([]);
+  const likingRef=useRef(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -88,6 +92,25 @@ export default function ShopApp({ mode, initialAuthor }: { mode:'local'|'google'
       else setError(saved ? `保存は完了しましたが、再取得できませんでした。再読み込みしてください。${text}` : text);
     } finally { lock.current = false; setBusy(false); setLoading(false); }
   }
+  async function like(shop:Shop) {
+    if(!repository.current || loadingRef.current || (lock.current && !likingRef.current))return;
+    likeQueue.current.push({id:shop.id,operation:crypto.randomUUID()});setLikePending(likeQueue.current.length);
+    if(likingRef.current)return;
+    likingRef.current=true;lock.current=true;setLiking(true);setBusy(true);setError('');setNotice('');++generation.current;
+    try {
+      do {
+      while(likeQueue.current.length){
+        const next=likeQueue.current[0];
+        await repository.current.like(next.id,next.operation);
+        likeQueue.current.shift();setLikePending(likeQueue.current.length);
+        setShops(old=>old.map(item=>item.id===next.id?{...item,likes:(item.likes??0)+1}:item));
+      }
+      try {setShops(await repository.current.list());}catch{setError('いいねは保存しましたが、再取得できませんでした。再読み込みしてください。');}
+      } while(likeQueue.current.length);
+    } catch {
+      likeQueue.current=[];setLikePending(0);setError('いいねの保存を確認できませんでした。再読み込みして回数を確認してください。');
+    } finally {likingRef.current=false;lock.current=false;setLiking(false);setBusy(false);}
+  }
   async function add(event: FormEvent) {
     event.preventDefault(); if (lock.current) return;
     let tags: string[];
@@ -112,11 +135,11 @@ export default function ShopApp({ mode, initialAuthor }: { mode:'local'|'google'
     <main className="main">
       <section className="intro"><div><h1>お店一覧</h1></div><button className="primary add-button" onClick={() => open({type:'add'})} disabled={busy || loading}><Plus size={18} />お店を追加</button></section>
       <div className="summary"><Bookmark size={17} /><span>まだ行っていないお店 <strong>{remaining}</strong> 件</span><span className="summary-divider"/><Check size={17} /><span>行ったお店 <strong>{shops.length - remaining}</strong> 件</span></div>
-      <section className="filters" aria-label="お店の検索と絞り込み"><label className="search"><Search size={20}/><span className="sr-only">登録したお店を検索</span><input type="search" placeholder="店名、書いた人、URLで検索" value={query} onChange={e => setQuery(e.target.value)} /></label><div className="filter-row"><div className="filter-group"><span id="status-label">訪問状態</span><div className="segments" role="group" aria-labelledby="status-label">{['すべて','まだ','行った'].map(value => <button key={value} aria-pressed={status === value} onClick={() => setStatus(value)}>{value === '行った' && <Check size={14}/>} {value}</button>)}</div></div><label className="select-label">書いた人<select aria-label="書いた人" value={by} onChange={e => setBy(e.target.value)}><option>全員</option><option>なおと</option><option>あずさ</option></select></label><label className="select-label sort">登録日<select aria-label="登録日" value={order} onChange={e => setOrder(e.target.value)}><option>新しい順</option><option>古い順</option></select></label></div><div className="tag-filter" role="group" aria-label="タグで絞り込み"><div className="tag-filter-heading"><span>タグ</span>{selectedTags.length > 0 && <button className="quiet" onClick={()=>setSelectedTags([])}>タグ選択を解除</button>}</div><div className="tag-options" id="filter-tag-options">{tagOptions.filter((value,index)=>showAllTags || index < 4 || selectedTags.includes(value)).map(value=><button key={value} aria-pressed={selectedTags.includes(value)} onClick={()=>setSelectedTags(old=>old.includes(value)?old.filter(item=>item!==value):[...old,value])}>{selectedTags.includes(value) && <Check size={14}/>} {value}</button>)}</div>{tagOptions.length > 4 && <button className="quiet" aria-expanded={showAllTags} aria-controls="filter-tag-options" onClick={()=>setShowAllTags(old=>!old)}>{showAllTags ? '表示を減らす' : 'タグをもっと表示'}</button>}</div><div className="region-filters"><label className="select-label">都道府県<select aria-label="都道府県" value={prefecture} onChange={e => {setPrefecture(e.target.value);setMunicipality('すべて');}}><option>すべて</option>{[...new Set([...availablePrefectures,...(prefecture !== 'すべて' && prefecture !== '特定不可' ? [prefecture] : [])])].map(value=><option key={value}>{value}</option>)}<option>特定不可</option></select></label>{prefecture === '東京都' && <label className="select-label">区・市町村<select aria-label="区・市町村" value={municipality} onChange={e => setMunicipality(e.target.value)}><option>すべて</option>{[...new Set([...areas,...(municipality !== 'すべて' && municipality !== '特定不可' ? [municipality] : [])])].map(value=><option key={value}>{value}</option>)}<option>特定不可</option></select></label>}{pending.size > 0 && <span className="region-progress" role="status">地域を確認中…（残り{pending.size}件）</span>}</div></section>
+      <section className="filters" aria-label="お店の検索と絞り込み"><label className="search"><Search size={20}/><span className="sr-only">登録したお店を検索</span><input type="search" placeholder="店名、書いた人、URLで検索" value={query} onChange={e => setQuery(e.target.value)} /></label><div className="filter-row"><div className="filter-group"><span id="status-label">訪問状態</span><div className="segments" role="group" aria-labelledby="status-label">{['すべて','まだ','行った'].map(value => <button key={value} aria-pressed={status === value} onClick={() => setStatus(value)}>{value === '行った' && <Check size={14}/>} {value}</button>)}</div></div><label className="select-label">書いた人<select aria-label="書いた人" value={by} onChange={e => setBy(e.target.value)}><option>全員</option><option>なおと</option><option>あずさ</option></select></label><label className="select-label sort">並び順<select aria-label="並び順" value={order} onChange={e => setOrder(e.target.value)}><option>新しい順</option><option>古い順</option><option>いいねが多い順</option></select></label></div><div className="tag-filter" role="group" aria-label="タグで絞り込み"><div className="tag-filter-heading"><span>タグ</span>{selectedTags.length > 0 && <button className="quiet" onClick={()=>setSelectedTags([])}>タグ選択を解除</button>}</div><div className="tag-options" id="filter-tag-options">{tagOptions.filter((value,index)=>showAllTags || index < 4 || selectedTags.includes(value)).map(value=><button key={value} aria-pressed={selectedTags.includes(value)} onClick={()=>setSelectedTags(old=>old.includes(value)?old.filter(item=>item!==value):[...old,value])}>{selectedTags.includes(value) && <Check size={14}/>} {value}</button>)}</div>{tagOptions.length > 4 && <button className="quiet" aria-expanded={showAllTags} aria-controls="filter-tag-options" onClick={()=>setShowAllTags(old=>!old)}>{showAllTags ? '表示を減らす' : 'タグをもっと表示'}</button>}</div><div className="region-filters"><label className="select-label">都道府県<select aria-label="都道府県" value={prefecture} onChange={e => {setPrefecture(e.target.value);setMunicipality('すべて');}}><option>すべて</option>{[...new Set([...availablePrefectures,...(prefecture !== 'すべて' && prefecture !== '特定不可' ? [prefecture] : [])])].map(value=><option key={value}>{value}</option>)}<option>特定不可</option></select></label>{prefecture === '東京都' && <label className="select-label">区・市町村<select aria-label="区・市町村" value={municipality} onChange={e => setMunicipality(e.target.value)}><option>すべて</option>{[...new Set([...areas,...(municipality !== 'すべて' && municipality !== '特定不可' ? [municipality] : [])])].map(value=><option key={value}>{value}</option>)}<option>特定不可</option></select></label>}{pending.size > 0 && <span className="region-progress" role="status">地域を確認中…（残り{pending.size}件）</span>}</div></section>
       <div className="results-bar"><p aria-live="polite"><strong>{visible.length}</strong> 件のお店 <span className="muted">{`／ 全 ${shops.length} 件`}</span></p><button className="quiet" onClick={() => {void refresh();setPreviewRefresh(value=>value+1);}} disabled={busy || loading}><RefreshCw size={15} className={loading ? 'spinning' : ''}/>{loading ? '読み込み中' : '再読み込み'}</button></div>
       {error && <div className="message error" role="alert"><AlertCircle size={18}/><div>{error}{!demo && <p><a href="/login">再ログインする</a></p>}</div></div>}
       {notice && <div className="message success" role="status"><Check size={18}/>{notice}</div>}
-      {busy && <div className="saving" role="status">保存中…</div>}
+      {busy && <div className="saving" role="status">{liking ? `いいねを保存中…（残り${likePending}回）` : '保存中…'}</div>}
       {(missing > 0 || repeated) && <div className="message warning"><div>{missing > 0 && <p>IDのないお店が {missing} 件あります。更新する前にIDを補完してください。</p>}{repeated && <p>IDが重複したお店は更新・削除できません。元データのIDを修正してください。</p>}</div>{missing > 0 && <button disabled={busy || loading} onClick={() => open({type:'ids'})}>IDを補完</button>}</div>}
       {loading && shops.length === 0 ? <div className="grid" aria-label="読み込み中">{[1,2,3].map(i=><div className="skeleton" key={i}/>)}</div> : visible.length ? <section className="grid" aria-label="お店の一覧">{visible.map(shop => {
         const preview = display(shop); const invalid = !shop.id || (counts.get(shop.id.toLowerCase()) ?? 0) > 1;
@@ -129,6 +152,7 @@ export default function ShopApp({ mode, initialAuthor }: { mode:'local'|'google'
             <div className="card-meta"><span className={`mini-avatar ${shop.author === 'あずさ' ? 'azusa' : ''}`}>{shop.author.slice(0,1)}</span><span>{shop.author}</span><time dateTime={shop.date}>{shop.date.replaceAll('-','.')}</time><span className={`native-status ${shop.visited ? 'visited' : ''}`}>{shop.visited ? '行った' : 'まだ'}</span></div>
             <div className="card-tags"><div className="tag-list">{shop.tags?.length ? shop.tags.map(value=><span className="tag-badge" key={value}>{value}</span>) : null}</div><button className="quiet tag-edit" aria-label={`${preview.title}のタグを編集`} disabled={busy || loading || invalid} onClick={()=>open({type:'tags',shop})}>タグを編集</button></div>
             <a className="maps-link" href={shop.url} target="_blank" rel="noopener noreferrer"><MapPin size={15}/>Google Mapsで開く<ArrowUpRight size={14}/></a>
+            <div className="like-row"><button className="like-button" aria-label={`${preview.title}にいいね`} disabled={loading || invalid || (busy && !liking)} onClick={()=>void like(shop)}><Heart size={17}/>いいね <span className="like-count">{shop.likes??0}</span></button></div>
             <div className="card-actions"><button className={shop.visited ? 'visit done' : 'visit'} disabled={busy || loading || invalid} onClick={() => void mutate(() => repository.current!.setVisited(shop.id, !shop.visited), shop.visited ? '「まだ」に戻しました。' : '「行った」に更新しました。')}>{shop.visited ? <RotateCcw size={16}/> : <Check size={17}/>} {shop.visited ? 'まだに戻す' : '行った！'}</button><button className="delete" aria-label={`${preview.title}を削除`} disabled={busy || loading || invalid} onClick={() => open({type:'delete',shop})}><Trash2 size={16}/></button></div>{invalid && <p className="invalid">IDの確認が必要です</p>}
           </div>
         </article>;

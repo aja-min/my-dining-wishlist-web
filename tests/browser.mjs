@@ -19,7 +19,7 @@ async function stored(){return page.evaluate(k=>JSON.parse(localStorage.getItem(
 try {
  await page.goto(base);await settle();await expect(page.locator('article')).toHaveCount(6);await expect(status('まだ')).toHaveAttribute('aria-pressed','true');
  await page.getByRole('searchbox').fill('喫茶');await page.getByLabel('書いた人',{exact:true}).selectOption('なおと');await expect(page.locator('article')).toHaveCount(1);await page.getByLabel('書いた人',{exact:true}).selectOption('あずさ');await expect(page.getByText('条件に合うお店がありません')).toBeVisible();await page.getByRole('button',{name:'絞り込みをクリア'}).click();await expect(page.locator('article')).toHaveCount(8);
- await page.getByLabel('登録日',{exact:true}).selectOption('古い順');assert.equal(await page.locator('article time').first().textContent(),'2026.10.01');
+ await page.getByLabel('並び順',{exact:true}).selectOption('古い順');assert.equal(await page.locator('article time').first().textContent(),'2026.10.01');
  await add('https://www.google.com/maps/place/Naoto+Cafe','なおと');await expect(card('Naoto Cafe')).toContainText('なおと');
  await add('https://maps.app.goo.gl/azusa-test','あずさ');await expect(card('Google Mapsのお店')).toContainText('あずさ');await expect(card('Google Mapsのお店').locator('.map-unavailable')).toBeVisible();
  await page.reload();await settle();await expect(page.locator('article')).toHaveCount(8);

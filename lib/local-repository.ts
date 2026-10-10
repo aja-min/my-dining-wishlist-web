@@ -1,3 +1,4 @@
+import { likeOperation } from './likes';
 import { normalizeTags } from './tags';
 import { AppError, createShop, duplicate, parseCsv, parseRows, toRows, uniqueShop, type NewShop, type Shop } from './model';
 import type { ShopRepository } from './repository';
@@ -11,14 +12,19 @@ export class LocalRepository implements ShopRepository {
       if (saved === null) return parseCsv(await this.seed());
       const data = JSON.parse(saved);
       if (data.version !== 1 || !Array.isArray(data.rows)) throw new Error();
-      return parseRows(data.rows);
+      return parseRows(data.rows).map(shop=>{
+        const events=data.likeEvents?.[shop.id] ?? [];
+        if(!Array.isArray(events))throw new AppError('いいねの保存データが不正です。');
+        const likeOperations=[...new Set(events.map(likeOperation))];
+        return {...shop,likeOperations,likes:likeOperations.length};
+      });
     } catch (error) {
       if (error instanceof AppError) throw error;
       throw new AppError('保存データを読み込めません。ブラウザの保存設定を確認するか、サンプルにリセットしてください。');
     }
   }
   private write(shops: Shop[]) {
-    try { this.storage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, rows: toRows(shops) })); }
+    try { this.storage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, rows: toRows(shops), likeEvents:Object.fromEntries(shops.map(shop=>[shop.id,shop.likeOperations??[]])) })); }
     catch { throw new AppError('保存できませんでした。ブラウザの保存容量・設定を確認してください。'); }
   }
   private async edit<T>(change: (shops: Shop[]) => T): Promise<T> {
@@ -31,6 +37,10 @@ export class LocalRepository implements ShopRepository {
   async remove(id: string) { await this.edit(shops => { const shop = uniqueShop(shops, id); shops.splice(shops.indexOf(shop), 1); }); }
   async setVisited(id: string, visited: boolean) { await this.edit(shops => { uniqueShop(shops, id).visited = visited; }); }
   async setTags(id: string, tags: string[]) { const value = normalizeTags(tags); await this.edit(shops => { uniqueShop(shops, id).tags = value; }); }
+  async like(id:string,operationId:string) {
+    const operation=likeOperation(operationId);
+    await this.edit(shops=>{const shop=uniqueShop(shops,id);shop.likeOperations=[...new Set([...(shop.likeOperations??[]),operation])];shop.likes=shop.likeOperations.length;});
+  }
   async fillMissingIds() { return this.edit(shops => { let n = 0; shops.forEach(s => { if (!s.id) { s.id = crypto.randomUUID(); n++; } }); return n; }); }
   async reset() { const shops = parseCsv(await this.seed()); this.write(shops); }
 }

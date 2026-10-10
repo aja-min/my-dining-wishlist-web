@@ -2,7 +2,7 @@ import { normalizeTags, parseTagsCell } from './tags';
 import Papa from 'papaparse';
 export const HEADERS = ['ID', '書いた日にち', '書いた人', 'Google mapのURL', '行ったかどうか'] as const;
 export type Author = 'なおと' | 'あずさ';
-export type Shop = { id: string; date: string; author: Author; url: string; visited: boolean; row: number; tags?: string[] };
+export type Shop = { id: string; date: string; author: Author; url: string; visited: boolean; row: number; tags?: string[]; likes?: number; likeOperations?: string[] };
 export type NewShop = { url: string; author: Author; tags?: string[] };
 export class AppError extends Error {
   constructor(message: string, public status = 400, public existing?: Shop) { super(message); }

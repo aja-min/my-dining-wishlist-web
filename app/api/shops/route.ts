@@ -29,7 +29,10 @@ async function handle(request: NextRequest) {
     }
     if (typeof body.id !== 'string' || body.id.length > 100) throw new AppError('IDが不正です。');
     if (request.method === 'PATCH') {
-      if (tags !== undefined) {
+      if (body.action === 'like') {
+        if(tags !== undefined || Object.hasOwn(body,'visited'))throw new AppError('更新内容を1つだけ指定してください。');
+        await repository.like(body.id,body.operationId);
+      } else if (tags !== undefined) {
         if (Object.hasOwn(body, 'visited')) throw new AppError('更新内容を1つだけ指定してください。');
         await repository.setTags(body.id, tags);
       } else {

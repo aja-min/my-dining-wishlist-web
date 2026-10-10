@@ -8,5 +8,5 @@ export function filterShops(shops: Shop[], query: string, author: string, status
     const regionMatches = (prefecture === 'すべて' || (preview.prefecture ?? '特定不可') === prefecture) && (prefecture !== '東京都' || municipality === 'すべて' || (preview.municipality ?? '特定不可') === municipality);
     const tagMatches = !selectedTags.length || selectedTags.every(tag => (s.tags ?? []).includes(tag));
     return tagMatches && regionMatches && words.every(word => haystack.includes(word)) && (author === '全員' || s.author === author) && (status === 'すべて' || s.visited === (status === '行った'));
-  }).sort((a,b) => (order === '古い順' ? 1 : -1) * a.date.localeCompare(b.date) || a.row - b.row);
+  }).sort((a,b) => (order === 'いいねが多い順' ? (b.likes??0)-(a.likes??0) : 0) || (order === '古い順' ? 1 : -1) * a.date.localeCompare(b.date) || a.row - b.row);
 }

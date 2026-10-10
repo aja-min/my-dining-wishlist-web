@@ -21,5 +21,5 @@ export async function googleRepository(request: NextRequest) {
       throw new AppError('Google Sheetsへの通信に失敗しました。再読み込みして状態を確認してください。', 502);
     }
     return response.json();
-  }, tab, user.author);
+  }, tab, user.author, true);
 }

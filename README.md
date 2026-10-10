@@ -247,3 +247,15 @@ pushの処理時間は全試行合計4秒を上限にし、ネットワークエ
 - 署名なし／不正署名のWebhookは401です。シークレット未設定は503です。GoogleログインはWebhookに要求せず、LINE署名で認証します。
 
 参考: [LINE署名検証](https://developers.line.biz/ja/docs/messaging-api/verify-webhook-signature/)、[再試行キー](https://developers.line.biz/ja/docs/messaging-api/retrying-api-request/)、[push API](https://developers.line.biz/ja/reference/messaging-api/#send-push-message)。
+
+### いいねと並び替え
+
+各カードの「いいね」は押すたびに1回加算し、同じ人でも何回でも押せます。「並び順」で「いいねが多い順」を選択できます。同数なら登録日の新しい順です。タグ・地域・訪問状態と併用できます。いいねではLINE通知を送信しません。
+
+同じスプレッドシートの「いいね履歴」タブ（操作ID／お店ID）へ保存します。公開前に `node --conditions=react-server --import tsx scripts/enable-likes.ts` でタブを作成します。既存のお店タブは変更しません。履歴を削除すると集計が減るため手動で消さないでください。削除したお店の履歴は集計表示から除外します。
+
+クリックごとにUUIDを割り当てて追記し、同じ操作IDの再試行は1回だけ数えます。通信失敗時は同じIDで1回再試行します。連打はキューで順次保存し、成功した分から画面を更新します。保存中は画面を閉じずに待ってください。保存を確認できない場合はエラーを出して残りの操作を止めるため、再読み込みで回数を確認してください。
+
+一覧と履歴を並行して取得し、サーバーで一括集計します。お店ごとの個別リクエストは行いません。履歴の取得失敗は0件にせずエラー表示します。初期確認では43店舗の読取は従来・変更後とも約300ms、ダミー1万件の集計処理は約17msでした（認証・描画・大量履歴のネットワーク転送は別）。履歴が大きくなったら集計キャッシュや履歴圧縮を検討してください。
+
+デモは従来のlocalStorage内に操作IDを保存します。`npm test` と `TEST_BASE_URL=http://127.0.0.1:3107 node tests/likes-browser.mjs` で保存・再試行・同時追記・連打・並び替え・スマホ表示を検証します。

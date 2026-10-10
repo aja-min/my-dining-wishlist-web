@@ -5,5 +5,6 @@ export interface ShopRepository {
   remove(id: string): Promise<void>;
   setVisited(id: string, visited: boolean): Promise<void>;
   setTags(id: string, tags: string[]): Promise<void>;
+  like(id: string, operationId: string): Promise<void>;
   fillMissingIds(): Promise<number>;
 }

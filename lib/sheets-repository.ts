@@ -1,3 +1,4 @@
+import { LIKES_TAB, likeOperation, readLikes } from './likes';
 import { normalizeTags } from './tags';
 import { AppError, HEADERS, createShop, duplicate, parseRows, uniqueShop, type Author, type NewShop, type Shop } from './model';
 import type { ShopRepository } from './repository';
@@ -6,7 +7,7 @@ export type SheetsRequest = (suffix: string, init?: RequestInit) => Promise<any>
 // and one configured spreadsheet. It never receives a spreadsheet ID from the UI.
 export class SheetsRepository implements ShopRepository {
   private range: string;
-  constructor(private request: SheetsRequest, private tab: string, private author: Author) { this.range = `'${tab.replace(/'/g, "''")}'`; }
+  constructor(private request: SheetsRequest, private tab: string, private author: Author, private likesEnabled = false) { this.range = `'${tab.replace(/'/g, "''")}'`; }
   private async snapshot(requireTags = false) {
     const data = await this.request(`/values/${encodeURIComponent(this.range)}?valueRenderOption=FORMATTED_VALUE&dateTimeRenderOption=FORMATTED_STRING`);
     const rows: unknown[][] = data.values ?? [];
@@ -17,7 +18,22 @@ export class SheetsRepository implements ShopRepository {
     if (requireTags && rows[0][5] !== 'タグ') throw new AppError('タグ保存用の列が未設定です。管理者に確認してください。', 503);
     return shops;
   }
-  async list() { return this.snapshot(); }
+  private async likeSnapshot() {
+    return readLikes((await this.request(`/values/${encodeURIComponent(`'${LIKES_TAB}'!A:B`)}`)).values??[]);
+  }
+  async list() {
+    if(!this.likesEnabled)return this.snapshot();
+    const [shops,likes]=await Promise.all([this.snapshot(),this.likeSnapshot()]);
+    return shops.map(shop=>({...shop,likes:likes.get(shop.id.toLowerCase())?.size??0}));
+  }
+  async like(id:string,operationId:string) {
+    if(!this.likesEnabled)throw new AppError('いいねが未設定です。',503);
+    const operation=likeOperation(operationId);
+    const [shops,existing]=await Promise.all([this.snapshot(),this.likeSnapshot()]);
+    const shop=uniqueShop(shops,id);
+    if(existing.get(shop.id.toLowerCase())?.has(operation))return;
+    await this.request(`/values/${encodeURIComponent(`'${LIKES_TAB}'!A:B`)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,{method:'POST',body:JSON.stringify({values:[[operation,shop.id.toLowerCase()]]})});
+  }
   private async writeCell(range: string, values: unknown[][]) {
     await this.request(`/values/${encodeURIComponent(`${this.range}!${range}`)}?valueInputOption=RAW`, { method: 'PUT', body: JSON.stringify({ values }) });
   }
