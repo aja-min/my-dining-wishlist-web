@@ -200,3 +200,50 @@ Google Maps共有URLの転送先などに含まれる日本語住所から、都
 ブラウザ検証: `TEST_BASE_URL=http://127.0.0.1:3104 node tests/tags-browser.mjs`（デモサーバーを使用）。
 
 タグの絞り込みはプリセット4つをボタン表示し、「タグをもっと表示」で全候補を展開します。複数選択は、選択したすべてのタグに一致する店舗を表示します。折りたたんでも選択中のタグは表示し、再度押すか「タグ選択を解除」で解除できます。
+
+### LINEグループへの追加通知（Messaging API）
+
+UIは変更しません。認証済みの `POST /api/shops` でGoogle Sheetsへの新規追加が成功した後だけ、サーバーがpush APIをawaitします。追加者はサーバーのGoogle認証に紐づく保存結果の「なおと／あずさ」です。クライアントから指定された名前は使用しません。タグ編集・訪問更新・削除・一覧・ID補完・Sheetsへの直接入力・ローカルCSVモードは通知対象外です。
+
+通知は1つのテキストメッセージで、次の3行です。
+
+```text
+🍽️ {追加した人}が「いきたいお店」を追加しました
+Googleマップ: {保存したGoogleマップURL}
+URL: {APP_URL}
+```
+
+#### 環境変数と設定順序
+
+Vercelのプロジェクト → Settings → Environment Variablesへ、次のサーバー専用変数を設定してください。`NEXT_PUBLIC_`は付けず、鍵をGitやチャットに貼り付けないでください。
+
+- `LINE_CHANNEL_ACCESS_TOKEN`: Messaging APIチャネルのアクセストークン。
+- `LINE_CHANNEL_SECRET`: 同じチャネルのチャネルシークレット（署名検証用）。
+- `LINE_GROUP_ID`: 通知する夫婦のグループのID（`C`から始まるID）。
+- `APP_URL`: `https://my-dining-wishlist-web.vercel.app/`。HTTPSのアプリURLを指定します。
+
+1. LINE公式アカウントでMessaging APIを有効にし、LINE Developersコンソールで上記のトークンとシークレットを確認します。「グループ・複数人トークへの参加を許可する」を有効にします。自動応答・あいさつメッセージは必要に応じて無効にしてください。このアプリは返信しません。
+2. まずVercelのProductionへトークン・シークレット・APP_URLを設定して再デプロイします。GitHubのmainへのpushでコードが反映されます。環境変数だけを変更した場合も、DeploymentsからProductionをRedeployしてください。Previewには本番のLINE送信設定をコピーしないでください。
+3. LINE DevelopersのMessaging API設定にWebhook URL `https://my-dining-wishlist-web.vercel.app/api/line/webhook` を設定し、「検証」を実行してWebhookの利用を有効にします。正しい署名の `events: []` は200を返します。
+4. Botを夫婦のLINEグループへ招待するか、そのグループで **通知設定** と送信します。
+5. Vercelのプロジェクト → Logs（FunctionsのRuntime Logs）で `/api/line/webhook` のログを開きます。該当イベント時には **groupId文字列だけ** が出力されます。これを `LINE_GROUP_ID` としてProductionに設定し、再デプロイしてください。本文・ユーザーID・トークンはログに出しません。Webhookは通知先を保存・変更しません。
+6. LINE側の送信可能通数・プランと、Botが対象グループに参加していることを確認します。
+
+#### 失敗・再試行・重複登録
+
+pushの処理時間は全試行合計4秒を上限にし、ネットワークエラー／5xx時だけ最大1回再試行します。各試行で保存済みのお店のUUIDを同じ `X-Line-Retry-Key` として使います。LINEが受理済みを示す409と `x-line-accepted-request-id` を返した場合も再送を止めます。4xxは再試行しません。設定不足や失敗は `[line]` で始まるサーバーログに、値やレスポンス本文を含めず記録します。通知が失敗しても保存結果は201で返し、お店の取り消しや再登録要求はしません。
+
+同じURLの再追加は既存の重複チェックで409となり、通知しません。UIの多重送信防止も維持しています。ただしSheetsの読取→追加には分散トランザクションや一意制約がなく、別端末からの完全同時追加は重複し得ます。異なるUUIDで保存された行は別の追加として扱います。LINEの再試行キーは同じ保存済み行の送信重複を防ぐ仕組みで、Sheetsの同時書き込み競合は防ぎません。
+
+通知はベストエフォートです。Sheets保存直後のプロセス停止や、タイムアウト・再試行上限到達時の配信まで保証する永続キューはありません。LINE APIの受理も端末への到達を保証するものではありません。保存された店を通知目的で再登録しないでください。
+
+#### 動作確認
+
+- `npm test`：署名、改ざん、空イベント、groupId以外をログに出さないこと、指定3行、保存失敗、通知失敗、同じキーでの再試行をモックで検証します。実LINEへは送信しません。
+- `npm run build`：サーバー専用モジュールと型を検証します。
+- 設定後、許可されたGoogleアカウントで未登録のURLを1件追加し、Sheetsに1件・グループに3行のメッセージが1件届くことを確認します。
+- 同じURLを再登録しても増えず、タグ編集・行ったチェック・削除・再読み込み・Sheetsへの直接入力では通知しないことを確認します。
+- テスト用環境／グループで無効トークンを設定し、追加が成功してSheetsに残り、LogsにHTTPエラーが出ることを確認します。本番トークンを不用意に無効化しないでください。
+- 署名なし／不正署名のWebhookは401です。シークレット未設定は503です。GoogleログインはWebhookに要求せず、LINE署名で認証します。
+
+参考: [LINE署名検証](https://developers.line.biz/ja/docs/messaging-api/verify-webhook-signature/)、[再試行キー](https://developers.line.biz/ja/docs/messaging-api/retrying-api-request/)、[push API](https://developers.line.biz/ja/reference/messaging-api/#send-push-message)。

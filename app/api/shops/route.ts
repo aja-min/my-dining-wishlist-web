@@ -1,7 +1,10 @@
 import { type NextRequest } from 'next/server';
+import { addAndNotify } from '@/lib/line-notification';
 import { normalizeTags } from '@/lib/tags';
 import { AppError } from '@/lib/model';
 import { googleRepository } from '@/lib/google-server';
+export const runtime = 'nodejs';
+export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
 async function handle(request: NextRequest) {
   try {
@@ -22,7 +25,7 @@ async function handle(request: NextRequest) {
       if (body.action === 'fillMissingIds') return Response.json({ count: await repository.fillMissingIds() });
       if (typeof body.url !== 'string') throw new AppError('Google MapsのURLを入力してください。');
       // Author supplied by a client is deliberately ignored; adapter uses server identity.
-      return Response.json({ shop: await repository.add({ url: body.url, author:'なおと', tags }) }, { status:201 });
+      return Response.json({ shop: await addAndNotify(repository, { url: body.url, author:'なおと', tags }) }, { status:201 });
     }
     if (typeof body.id !== 'string' || body.id.length > 100) throw new AppError('IDが不正です。');
     if (request.method === 'PATCH') {
